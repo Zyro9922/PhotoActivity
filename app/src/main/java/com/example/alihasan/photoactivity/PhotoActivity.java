@@ -39,6 +39,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -116,12 +117,14 @@ public class PhotoActivity extends AppCompatActivity {
 
                 Toast.makeText(getApplicationContext(), "Blob...", Toast.LENGTH_SHORT).show();
 
-                final Intent emailIntent = new Intent( android.content.Intent.ACTION_SEND);
+                final Intent emailIntent = new Intent(Intent.ACTION_SEND);
 
                 emailIntent.setType("plain/text");
 
-                emailIntent.putExtra(android.content.Intent.EXTRA_TEXT,
-                        ""+base64conversion(photoFile));
+                emailIntent.putExtra(Intent.EXTRA_TEXT,
+                        ""+encodeImage(mResultsBitmap));
+
+//                ed.setText(""+encodeImage(mResultsBitmap));
 
                 startActivity(Intent.createChooser(
                         emailIntent, "Send mail..."));
@@ -183,12 +186,70 @@ public class PhotoActivity extends AppCompatActivity {
     private void processAndSetImage() {
 
         // Resample the saved image to fit the ImageView
-        mResultsBitmap = resamplePic(this, mTempPhotoPath);
+        mResultsBitmap = getBitmap(mTempPhotoPath);
 
         Toast.makeText(getApplicationContext(), "Intent send = new Intent(Intent.ACTION_SEND);", Toast.LENGTH_SHORT).show();
         // Set the new bitmap to the ImageView
         imageView.setImageBitmap(mResultsBitmap);
     }
+
+    private Bitmap getBitmap(String path) {
+
+        Uri uri = Uri.fromFile(new File(path));
+        InputStream in = null;
+        try {
+            final int IMAGE_MAX_SIZE = 1200000; // 1.2MP
+            in = getContentResolver().openInputStream(uri);
+
+            // Decode image size
+            BitmapFactory.Options o = new BitmapFactory.Options();
+            o.inJustDecodeBounds = true;
+            BitmapFactory.decodeStream(in, null, o);
+            in.close();
+
+
+            int scale = 1;
+            while ((o.outWidth * o.outHeight) * (1 / Math.pow(scale, 2)) >
+                    IMAGE_MAX_SIZE) {
+                scale++;
+            }
+
+            Bitmap b = null;
+            in = getContentResolver().openInputStream(uri);
+            if (scale > 1) {
+                scale--;
+                // scale to max possible inSampleSize that still yields an image
+                // larger than target
+                o = new BitmapFactory.Options();
+                o.inSampleSize = scale;
+                b = BitmapFactory.decodeStream(in, null, o);
+
+                // resize to desired dimensions
+                int height = b.getHeight();
+                int width = b.getWidth();
+
+                double y = Math.sqrt(IMAGE_MAX_SIZE
+                        / (((double) width) / height));
+                double x = (y / height) * width;
+
+                Bitmap scaledBitmap = Bitmap.createScaledBitmap(b, (int) x,
+                        (int) y, true);
+                b.recycle();
+                b = scaledBitmap;
+
+                System.gc();
+            } else {
+                b = BitmapFactory.decodeStream(in);
+            }
+            in.close();
+
+            return b;
+        } catch (IOException e) {
+            Log.e("", e.getMessage(), e);
+            return null;
+        }
+    }
+
 
     /**
      * Resamples the captured photo to fit the screen for better memory usage.
@@ -278,7 +339,6 @@ public class PhotoActivity extends AppCompatActivity {
             BitmapFactory.Options options = new BitmapFactory.Options();
             //THE JUICE
             options.inScaled = false;
-            Log.d("PP", " bitmap factory=========="+options);
             Bitmap user_picture_bmp = BitmapFactory.decodeStream(in, null, options);
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             user_picture_bmp.compress(Bitmap.CompressFormat.JPEG, 20, bos);
@@ -290,6 +350,16 @@ public class PhotoActivity extends AppCompatActivity {
             e.printStackTrace();
             return "ERROR";
         }
+    }
+
+    private String encodeImage(Bitmap bm)
+    {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        bm.compress(Bitmap.CompressFormat.JPEG,10,baos);
+        byte[] b = baos.toByteArray();
+        String encImage = Base64.encodeToString(b, Base64.DEFAULT);
+
+        return encImage;
     }
 
 
