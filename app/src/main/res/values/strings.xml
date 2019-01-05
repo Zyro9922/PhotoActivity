@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">PhotoActivity</string>
+
+    <string name="file_provider_authority" translatable="false">com.example.alihasan.photoactivity.fileprovider</string>
+
+    <string name="error">Error finding image</string>
+
+</resources>
